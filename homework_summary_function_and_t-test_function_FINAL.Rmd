@@ -1,0 +1,150 @@
+---
+title: "Homework: Summary Statistics Function and Two-Sample t-test Function"
+author: "Sympatique TUYISHIMIRE"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Data
+
+This homework uses the `hospital_patients` data set (505 patients, 17 variables).
+The data is read from the CSV file hospital_patients.csv. If the file is moved, the path in the code below must be updated.
+
+```{r load-data}
+hospital_patients <- read.csv("C:/Users/sympa/Downloads/home work R-for data science/hospital_patients.csv")
+
+head(hospital_patients)
+str(hospital_patients)
+```
+
+## Exercise 1: Summary statistics function
+
+**Task:** write a function that calculates summary statistics and apply it to a variable to show that it works.
+
+My function `my_summary()` takes one numeric vector `x` and returns the mean, median, standard deviation, minimum and maximum.
+It uses `na.rm = TRUE` so that missing values are skipped instead of making every result `NA`.
+
+```{r summary-function}
+my_summary <- function(x) {
+
+  avg    <- mean(x, na.rm = TRUE)
+  med    <- median(x, na.rm = TRUE)
+  spread <- sd(x, na.rm = TRUE)
+  low    <- min(x, na.rm = TRUE)
+  high   <- max(x, na.rm = TRUE)
+
+  return(c(mean = avg, median = med, sd = spread, min = low, max = high))
+}
+```
+
+### Test 1: systolic blood pressure (has 21 missing values)
+
+```{r test-systolic}
+my_summary(hospital_patients$systolic_bp)
+
+# built-in function, for comparison
+summary(hospital_patients$systolic_bp)
+```
+
+The minimum, median, mean and maximum from my function match the built-in `summary()`.
+The built-in output also shows `NA's = 21`, which are the missing values my function skipped.
+
+### Test 2: age (no missing values)
+
+```{r test-age}
+my_summary(hospital_patients$age)
+
+# built-in function, for comparison
+summary(hospital_patients$age)
+```
+
+Again the results match, so the same function works on different variables.
+
+**Conclusion for Exercise 1:** `my_summary()` works correctly. Its results match R's built-in `summary()` for both variables, and it handles missing values correctly.
+
+## Exercise 2: Two-sample t-test function
+
+**Task:** write a function that calculates a two-sample t-test and apply it to data.
+
+**Question:** do men and women in this hospital differ in mean systolic blood pressure?
+
+- H0 (null hypothesis): the mean systolic blood pressure is the same for men and women.
+- H1 (alternative hypothesis): the mean systolic blood pressure is different for men and women.
+
+### Preparing the two groups
+
+```{r split-groups}
+# Splitting systolic blood pressure into one vector per sex
+male   <- hospital_patients$systolic_bp[hospital_patients$sex == "Male"]
+female <- hospital_patients$systolic_bp[hospital_patients$sex == "Female"]
+
+length(male)     # 234 males, including missing values
+length(female)   # 271 females, including missing values
+```
+
+### The function
+
+The function `my_ttest()` calculates the Welch two-sample t-test, which does not assume that the two groups have equal variances.
+
+```{r ttest-function}
+my_ttest <- function(x, y) {
+
+  # remove missing values from each group
+  x <- x[!is.na(x)]
+  y <- y[!is.na(y)]
+
+  # mean, variance and number of observations of each group
+  mean_x <- mean(x)
+  mean_y <- mean(y)
+  var_x  <- var(x)
+  var_y  <- var(y)
+  n_x    <- length(x)
+  n_y    <- length(y)
+
+  # t statistic = difference in means / standard error of the difference
+  t_stat <- (mean_x - mean_y) / sqrt(var_x / n_x + var_y / n_y)
+
+  # degrees of freedom (Welch formula)
+  a  <- var_x / n_x
+  b  <- var_y / n_y
+  df <- (a + b)^2 / (a^2 / (n_x - 1) + b^2 / (n_y - 1))
+
+  # two-sided p-value
+  p_value <- 2 * pt(-abs(t_stat), df)
+
+  return(c(t = t_stat, df = df, p_value = p_value))
+}
+```
+
+### Applying the function
+
+```{r apply-ttest}
+my_ttest(male, female)
+```
+
+### Checking against the built-in t-test
+
+```{r builtin-ttest}
+t.test(male, female)
+```
+
+My t statistic (0.4529), degrees of freedom (473.4) and p-value (0.6508) are the same as the output of R's built-in `t.test()`, so the function is correct.
+
+## Conclusion
+
+**Exercise 1.** The function `my_summary()` correctly calculates the mean, median, standard deviation, minimum and maximum of a numeric variable, and ignores missing values. Its results are identical to R's `summary()` for `systolic_bp` and `age`.
+
+**Exercise 2.** The function `my_ttest()` reproduces the Welch two-sample t-test. Applied to systolic blood pressure by sex:
+
+- After removing 21 missing values, 227 men and 257 women were analysed.
+- Mean systolic blood pressure was 124.66 mmHg for men and 123.91 mmHg for women, a difference of about 0.75 mmHg.
+- The test gave t = 0.453, df = 473.4 and p = 0.651.
+- The 95% confidence interval for the difference is -2.52 to 4.03. It includes 0.
+
+Because the p-value (0.651) is much larger than 0.05, we **fail to reject the null hypothesis**. There is **no statistically significant difference** in mean systolic blood pressure between men and women in this data set. A difference of under 1 mmHg is also too small to matter clinically.
+
+**Limitations.** Failing to reject H0 does not prove that the two means are exactly equal; it only means this data gives no evidence of a difference. The 21 patients with missing blood pressure were left out of the analysis (complete-case analysis) and were not replaced with estimated values.
